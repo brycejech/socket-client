@@ -9,6 +9,7 @@
 import { Component, Vue } from 'vue-property-decorator';
 
 import { SocketClient } from './socket-client';
+import { ISocketMessage } from './socket-client/interfaces';
 
 @Component({
     components: { },
@@ -17,10 +18,18 @@ export default class App extends Vue {
 
     url:           string = 'ws://localhost:9999/websocket';
     channel:       string = 'foo';
-    clientId:      string = 'ba3d0493-46cc-4998-8248-849e481df103';
+    clientId:      string = '';
     lastMessageId: string = '';
 
     client: SocketClient = new SocketClient(this.url, this.channel, this.clientId, this.lastMessageId);
+
+    created(): void{
+        this.client.subscribe((message: ISocketMessage) => {
+            console.log(message);
+        });
+
+        (<any>window).client = this.client;
+    }
 
 }
 </script>
