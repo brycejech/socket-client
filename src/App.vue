@@ -8,11 +8,20 @@
 
 import { Component, Vue } from 'vue-property-decorator';
 
+import { SocketClient } from './socket-client';
+
 @Component({
     components: { },
 })
 export default class App extends Vue {
-    
+
+    url:           string = 'ws://localhost:9999/websocket';
+    channel:       string = 'foo';
+    clientId:      string = 'ba3d0493-46cc-4998-8248-849e481df103';
+    lastMessageId: string = '';
+
+    client: SocketClient = new SocketClient(this.url, this.channel, this.clientId, this.lastMessageId);
+
 }
 </script>
 
