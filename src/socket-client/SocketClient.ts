@@ -4,19 +4,24 @@ import { ISocketMessage } from './interfaces';
 export class SocketClient{
     private _socket: WebSocket|null = null;
 
+    private _baseUrl:       string = '';
     private _channel:       string = '';
     private _clientId:      string = '';
     private _lastMessageId: string = '';
 
+    // Socket connection timer fields
     private _timer:    number = 0;
     private _interval: number = 3000; // 3 seconds
 
+    // Page suspended timer fields
+    private _pageTimer:    number = 0;
+    private _pageInterval: number = 1000; // 1 second
+    private _lastInterval: number = Date.now();
+
     private _messageHandlers: Function[] = [];
 
-    baseUrl: string;
-
     constructor(baseUrl: string, channel: string, clientId: string, lastMessageId: string){
-        this.baseUrl        = baseUrl;
+        this._baseUrl        = baseUrl;
         this._channel       = channel;
         this._clientId      = clientId;
         this._lastMessageId = lastMessageId;
@@ -42,12 +47,29 @@ export class SocketClient{
         !this.isOpen() && this.open();
     }
 
+    pageHeartbeat(): void{
+        const now:   number = Date.now(),
+              diff:  number = now - this._lastInterval,
+              offBy: number = diff - 1000;
+
+        if(offBy > 1000){
+            console.info(`[${ (new Date()).toLocaleString() }] Page timeout, re-connecting`);
+
+            this.close();
+            this.open();
+        }
+
+        this._lastInterval = now;
+    }
+
     open(): WebSocket{
         clearInterval(this._timer);
+        clearInterval(this._pageTimer)
 
         this._socket = new WebSocket(this.getConnectionUrl());
 
-        this._timer = setInterval(this.heartbeat.bind(this), this._interval);
+        this._timer     = setInterval(this.heartbeat.bind(this), this._interval);
+        this._pageTimer = setInterval(this.pageHeartbeat.bind(this), this._pageInterval);
 
         this._socket.addEventListener('message', (e: MessageEvent) => {
             try{
@@ -72,11 +94,22 @@ export class SocketClient{
             }
         });
 
+        this._socket.addEventListener('close', (e: CloseEvent) => {
+            console.info(`[${ (new Date()).toLocaleString() }] Socket closing`);
+        });
+
+        this._socket.addEventListener('error', (e: Event) => {
+            console.info(`[${ (new Date()).toLocaleString() }] Socked error: ${ e }`);
+        })
+
+        console.info(`[${ (new Date()).toLocaleString() }] Connection opened: ${ this.getConnectionUrl() }`);
+
         return this._socket;
     }
 
     close(): void{
         clearInterval(this._timer);
+        clearInterval(this._pageInterval);
 
         this._socket && this._socket.close();
         this._socket = null;
@@ -102,7 +135,7 @@ export class SocketClient{
         ===============
     */
     private getConnectionUrl(): string{
-        let url = this.baseUrl;
+        let url = this._baseUrl;
 
         const params: { [key: string]: any } = {
             channel:       this._channel,
